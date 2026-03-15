@@ -81,8 +81,8 @@ export class LeaveRequestsService {
     });
   }
 
-  //approving the request but first fetch the user and decrement their annual leave entitlement
-  //then approve the request and return the updated request with employee and manager details
+  //approving the request
+  //update the request status and return with employee and manager details
   async approve(id: number, managerId: number) {
     const request = await this.prisma.leaveRequest.findUnique({
       where: { leaveRequestId: id },
@@ -104,22 +104,8 @@ export class LeaveRequestsService {
       throw new NotFoundException(`Manager with ID ${managerId} not found`);
     }
 
-    // Calculate leave days
-    const start = new Date(request.startDate);
-    const end = new Date(request.endDate);
-    const diffTime = end.getTime() - start.getTime();
-    const leaveDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-    // Decrement employee leave entitlement
-    await this.prisma.employee.update({
-      where: { employeeId: request.employeeId },
-      data: {
-        annualLeaveEntitlement: { decrement: leaveDays },
-      },
-    });
-
     // Update leave request status
-    const updatedRequest = await this.prisma.leaveRequest.update({
+    return this.prisma.leaveRequest.update({
       where: { leaveRequestId: id },
       data: {
         status: 'APPROVED',
@@ -131,8 +117,6 @@ export class LeaveRequestsService {
         manager: true,
       },
     });
-
-    return updatedRequest;
   }
 
 

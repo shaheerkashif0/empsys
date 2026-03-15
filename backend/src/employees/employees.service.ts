@@ -60,7 +60,7 @@ export class EmployeesService {
     return {
       ...employee,
       usedLeaveDays,
-      remainingLeaveDays: employee.annualLeaveEntitlement,
+      remainingLeaveDays: employee.annualLeaveEntitlement - usedLeaveDays,
       leaveRequests,
     };
   }

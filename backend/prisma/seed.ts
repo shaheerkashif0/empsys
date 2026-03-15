@@ -213,19 +213,6 @@ async function main() {
 
   for (const lr of leaveRequests) {
     await prisma.leaveRequest.create({ data: lr });
-
-    // Decrement employee entitlement for approved requests
-    if (lr.status === 'APPROVED') {
-      const days =
-        Math.ceil(
-          (lr.endDate.getTime() - lr.startDate.getTime()) /
-            (1000 * 60 * 60 * 24),
-        ) + 1;
-      await prisma.employee.update({
-        where: { employeeId: lr.employeeId },
-        data: { annualLeaveEntitlement: { decrement: days } },
-      });
-    }
   }
 
   console.log(`Created ${leaveRequests.length} leave requests`);
