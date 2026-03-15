@@ -12,9 +12,39 @@ import { LeaveStatus, LeaveType, Prisma } from '@prisma/client';
 export class LeaveRequestsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  //calculate how many leave days an employee has remaining
+  private async getRemainingDays(employeeId: number) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { employeeId },
+    });
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+    }
 
-//cretae new leave request 
-//employee id, start date, end date, type+comments
+    const approvedRequests = await this.prisma.leaveRequest.findMany({
+      where: { employeeId, status: 'APPROVED' },
+    });
+
+    let used = 0;
+    for (const req of approvedRequests) {
+      const start = new Date(req.startDate);
+      const end = new Date(req.endDate);
+      used += Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }
+
+    return {
+      entitlement: employee.annualLeaveEntitlement,
+      used,
+      remaining: employee.annualLeaveEntitlement - used,
+    };
+  }
+
+  private calcDays(start: Date, end: Date): number {
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  }
+
+  //create new leave request
+  //employee id, start date, end date, type+comments
   async create(dto: CreateLeaveRequestDto) {
     const employee = await this.prisma.employee.findUnique({
       where: { employeeId: dto.employeeId },
@@ -31,6 +61,16 @@ export class LeaveRequestsService {
 
     if (end < start) {
       throw new BadRequestException('End date must be after start date');
+    }
+
+    // Check if requested days exceed remaining balance
+    const requestedDays = this.calcDays(start, end);
+    const { remaining } = await this.getRemainingDays(dto.employeeId);
+
+    if (requestedDays > remaining) {
+      throw new BadRequestException(
+        `Insufficient leave balance. Requesting ${requestedDays} day(s) but only ${remaining} day(s) remaining out of ${employee.annualLeaveEntitlement} total entitlement.`,
+      );
     }
 
     return this.prisma.leaveRequest.create({
@@ -82,7 +122,7 @@ export class LeaveRequestsService {
   }
 
   //approving the request
-  //update the request status and return with employee and manager details
+  //check if approving would exceed entitlement, then update status
   async approve(id: number, managerId: number) {
     const request = await this.prisma.leaveRequest.findUnique({
       where: { leaveRequestId: id },
@@ -102,6 +142,16 @@ export class LeaveRequestsService {
 
     if (!manager) {
       throw new NotFoundException(`Manager with ID ${managerId} not found`);
+    }
+
+    // Check if approving would exceed entitlement
+    const leaveDays = this.calcDays(new Date(request.startDate), new Date(request.endDate));
+    const { remaining, entitlement } = await this.getRemainingDays(request.employeeId);
+
+    if (leaveDays > remaining) {
+      throw new BadRequestException(
+        `Cannot approve. This request is for ${leaveDays} day(s) but the employee only has ${remaining} day(s) remaining out of ${entitlement} total entitlement.`,
+      );
     }
 
     // Update leave request status
