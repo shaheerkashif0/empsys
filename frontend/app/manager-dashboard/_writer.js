@@ -1,0 +1,1 @@
+const fs=require("fs");const p=require("path");const d=fs.readFileSync(p.join(__dirname,"_content.b64"),"utf8");fs.writeFileSync(p.join(__dirname,"page.tsx"),Buffer.from(d,"base64").toString("utf8"));console.log("done");fs.unlinkSync(p.join(__dirname,"_writer.js"));fs.unlinkSync(p.join(__dirname,"_content.b64"));

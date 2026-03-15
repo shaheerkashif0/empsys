@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  employeeId           Int            @id @default(autoincrement()) @map("employee_id")
+  name                 String         @db.VarChar(255)
+  email                String         @unique @db.VarChar(255)
+  department           String         @db.VarChar(255)
+  annualLeaveEntitlement Int          @default(20) @map("annual_leave_entitlement")
+  createdAt            DateTime       @default(now()) @map("created_at")
+
+  leaveRequests        LeaveRequest[]
+
+  @@map("employees")
+}
+
+model Manager {
+  managerId  Int            @id @default(autoincrement()) @map("manager_id")
+  name       String         @db.VarChar(255)
+  email      String         @unique @db.VarChar(255)
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  leaveRequests LeaveRequest[]
+
+  @@map("managers")
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  PERSONAL
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model LeaveRequest {
+  leaveRequestId Int          @id @default(autoincrement()) @map("leave_request_id")
+  employeeId     Int          @map("employee_id")
+  managerId      Int?         @map("manager_id")
+  startDate      DateTime     @map("start_date") @db.Date
+  endDate        DateTime     @map("end_date") @db.Date
+  leaveType      LeaveType    @map("leave_type")
+  notes          String?
+  status         LeaveStatus  @default(PENDING)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  decisionDate   DateTime?    @map("decision_date")
+
+  employee       Employee     @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  manager        Manager?     @relation(fields: [managerId], references: [managerId], onDelete: SetNull)
+
+  @@map("leave_requests")
+}
